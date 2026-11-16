@@ -1,8 +1,5 @@
-/**
- * @file benchmark.c
- * @brief Benchmarks de ordenação por z_index e de picking (CSV para stdout).
- * Uso: ./benchmark
- */
+// benchmarks de ordenação e de picking (escreve CSV no stdout)
+
 #include <stdio.h>
 #include <math.h>
 #include <stdlib.h>
@@ -13,15 +10,12 @@
 #define W 1000
 #define H 1000
 
-/* Cena com n círculos pequenos (raio 5..20) em posições e z aleatórios. */
+// cena com n círculos aleatórios (z aleatório, ordenado ou inverso)
 static VectorScene* make_scene(int n, int z_mode) {
   VectorScene* s = vector_scene_create(W, H, (Color){255, 255, 255});
   for (int i = 0; i < n; i++) {
     Point c = {rand() % W, rand() % H};
-    int z = (z_mode == 0) ? rand() % 1000000    /* aleatório */
-            : (z_mode == 1) ? i                 /* já ordenado */
-                            : n - i;            /* ordem inversa */
-    Primitive* p = primitive_create_circle(
+    int z = (z_mode == 0) ? rand() % 1000000                : (z_mode == 1) ? i                                             : n - i;                Primitive* p = primitive_create_circle(
         -1, c, 5 + rand() % 16, (Color){rand() % 256, rand() % 256, 0}, 1.0, z);
     vector_scene_add_primitive(s, p);
   }
@@ -32,9 +26,7 @@ static double now_ms(void) {
   return (double)clock() * 1000.0 / CLOCKS_PER_SEC;
 }
 
-
-/* Cena com n polígonos de 32 vértices (aproximam círculos): o teste exato
- * (ray-casting) custa O(32), muito mais que um teste de AABB. */
+// cena com n polígonos de 32 vértices, onde o teste exato é mais caro
 static VectorScene* make_poly_scene(int n) {
   VectorScene* s = vector_scene_create(W, H, (Color){255, 255, 255});
   for (int i = 0; i < n; i++) {
@@ -50,7 +42,7 @@ static VectorScene* make_poly_scene(int n) {
   return s;
 }
 
-/* M picks em pontos aleatórios com as duas estratégias; compara resultados. */
+// M seleções com as duas estratégias, confirmando que dão o mesmo resultado
 static void bench_pick(const char* label, VectorScene* s, int n) {
   const int M = 1000;
   vector_scene_sort_by_z(s, true, NULL);

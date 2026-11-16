@@ -1,7 +1,5 @@
-/**
- * @file extra_tests.c
- * @brief Testes adicionais (próprios do grupo) para Primitive e VectorScene.
- */
+// testes adicionais do grupo para Primitive e VectorScene
+
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -21,9 +19,10 @@ static int run = 0, failed = 0;
 
 static const Color RED = {255, 0, 0};
 
+// vários realloc e remoções no array de vértices
 static void test_polygon_growth(void) {
   Primitive* poly = primitive_create_polygon(1, RED, 1.0, 0);
-  for (int i = 0; i < 100; i++) {  // força vários realloc
+  for (int i = 0; i < 100; i++) {
     CHECK(polygon_add_vertex(poly, (Point){i, i * 2.0}), "add vertex");
   }
   CHECK(polygon_get_num_vertices(poly) == 100, "100 vértices");
@@ -43,6 +42,7 @@ static void test_polygon_growth(void) {
   primitive_destroy(poly);
 }
 
+// AABB e pertença de ponto em cada tipo
 static void test_aabb_and_contains(void) {
   Primitive* r = primitive_create_rectangle(1, (Point){10, 20}, 30, 40, RED, 1, 0);
   BoundingBox b = primitive_get_aabb(r);
@@ -70,13 +70,14 @@ static void test_aabb_and_contains(void) {
   CHECK(b.min.x == 0 && b.max.x == 10 && b.max.y == 10, "AABB triângulo");
   CHECK(primitive_contains_point(t, (Point){5, 3}), "triângulo contém");
   CHECK(!primitive_contains_point(t, (Point){1, 9}), "triângulo não contém");
-  polygon_add_vertex(t, (Point){5, 50});  // AABB tem de ser recalculada
+  polygon_add_vertex(t, (Point){5, 50});
   CHECK(t->is_aabb_dirty, "dirty após add");
   b = primitive_get_aabb(t);
   CHECK(b.max.y == 50 && !t->is_aabb_dirty, "AABB recalculada (lazy)");
   primitive_destroy(t);
 }
 
+// translação, escala e parâmetros inválidos
 static void test_transforms(void) {
   Primitive* c = primitive_create_circle(1, (Point){10, 10}, 4, RED, 1, 0);
   primitive_scale(c, 2.0);
@@ -86,7 +87,7 @@ static void test_transforms(void) {
   primitive_destroy(c);
 
   Primitive* s = primitive_create_segment(2, (Point){0, 0}, (Point){10, 0}, RED, 1, 0);
-  primitive_scale(s, 2.0);  // relativo ao ponto médio (5,0)
+  primitive_scale(s, 2.0);
   CHECK(s->geom.segment.p1.x == -5 && s->geom.segment.p2.x == 15, "escala segmento");
   primitive_destroy(s);
 
@@ -95,7 +96,7 @@ static void test_transforms(void) {
   polygon_add_vertex(p, (Point){10, 0});
   polygon_add_vertex(p, (Point){10, 10});
   polygon_add_vertex(p, (Point){0, 10});
-  primitive_scale(p, 2.0);  // centro (5,5): passa a ir de -5 a 15
+  primitive_scale(p, 2.0);
   BoundingBox b = primitive_get_aabb(p);
   CHECK(b.min.x == -5 && b.max.x == 15 && b.min.y == -5 && b.max.y == 15,
         "escala polígono em torno do centro");
@@ -112,10 +113,11 @@ static void test_transforms(void) {
   primitive_destroy(r);
 }
 
+// crescimento do array da cena, IDs, remoção
 static void test_scene_collection(void) {
   VectorScene* s = vector_scene_create(100, 100, RED);
   CHECK(vector_scene_create(0, 10, RED) == NULL, "largura 0 rejeitada");
-  for (int i = 0; i < 50; i++) {  // > capacidade inicial (8)
+  for (int i = 0; i < 50; i++) {
     int id = vector_scene_add_primitive(
         s, primitive_create_circle(-1, (Point){i, i}, 2, RED, 1, 50 - i));
     CHECK(id == i, "IDs automáticos sequenciais");
@@ -138,6 +140,7 @@ static void test_scene_collection(void) {
   vector_scene_destroy(s);
 }
 
+// verifica se a cena está ordenada por z_index
 static int is_sorted(VectorScene* s) {
   for (size_t i = 1; i < vector_scene_get_count(s); i++)
     if (primitive_get_z_index(vector_scene_get_primitive_by_index(s, i - 1)) >
@@ -146,6 +149,7 @@ static int is_sorted(VectorScene* s) {
   return 1;
 }
 
+// ordenação (correção e estabilidade) e picking (as duas estratégias concordam)
 static void test_sorting_and_picking(void) {
   for (int fast = 0; fast < 2; fast++) {
     srand(7);
@@ -158,14 +162,13 @@ static void test_sorting_and_picking(void) {
     CHECK(is_sorted(s), "ordenado por z");
     CHECK(vector_scene_get_count(s) == 300, "nenhuma primitiva perdida");
     unsigned long c1 = st.comparisons;
-    vector_scene_sort_by_z(s, fast, &st);  // já ordenado: continua certo
+    vector_scene_sort_by_z(s, fast, &st);
     CHECK(is_sorted(s) && st.comparisons > 0, "re-ordenar");
     if (!fast) CHECK(st.comparisons == 299 && st.swaps == 0, "insertion: melhor caso");
     CHECK(c1 > 0, "contou comparações");
     vector_scene_destroy(s);
   }
 
-  // Estabilidade: empates mantêm a ordem de inserção
   VectorScene* s = vector_scene_create(10, 10, RED);
   for (int i = 0; i < 20; i++)
     vector_scene_add_primitive(s, primitive_create_circle(-1, (Point){5, 5}, 1, RED, 1, i % 2));
@@ -179,7 +182,6 @@ static void test_sorting_and_picking(void) {
   CHECK(stable, "MergeSort estável");
   vector_scene_destroy(s);
 
-  // Picking: estratégias concordam, mesmo com array NÃO ordenado
   srand(3);
   s = vector_scene_create(100, 100, RED);
   for (int i = 0; i < 200; i++)
@@ -194,7 +196,6 @@ static void test_sorting_and_picking(void) {
     if (d != o) mismatch++;
     CHECK(b.exact_tests <= a.exact_tests, "opt nunca faz mais testes exatos");
     CHECK(a.aabb_tests == 0, "direto não usa AABB");
-    // verificação por força bruta: o escolhido tem o maior z entre os que contêm pt
     int best_z = -1;
     for (size_t k = 0; k < vector_scene_get_count(s); k++) {
       Primitive* q = vector_scene_get_primitive_by_index(s, k);
@@ -210,19 +211,19 @@ static void test_sorting_and_picking(void) {
   vector_scene_destroy(s);
 }
 
+// render com clipping, alpha blending e gravar/carregar .vsc
 static void test_render_and_io(void) {
   VectorScene* s = vector_scene_create(50, 50, (Color){0, 0, 0});
   vector_scene_add_primitive(s, primitive_create_rectangle(
       -1, (Point){0, 0}, 50, 50, (Color){200, 100, 0}, 0.5, 1));
   Primitive* poly = primitive_create_polygon(-1, (Color){0, 255, 0}, 1.0, 2);
-  polygon_add_vertex(poly, (Point){-100, -100});  // sai do canvas: clipping
+  polygon_add_vertex(poly, (Point){-100, -100});
   polygon_add_vertex(poly, (Point){20, -100});
   polygon_add_vertex(poly, (Point){20, 20});
   vector_scene_add_primitive(s, poly);
   CHECK(vector_scene_render(s, "extra_render.ppm"), "render com clipping");
   CHECK(!vector_scene_render(s, "/nao/existe/x.ppm"), "render em caminho inválido");
 
-  // alpha blending: laranja 0.5 sobre preto = (100, 50, 0) no pixel (49,49) (zona sem polígono)
   FILE* f = fopen("extra_render.ppm", "rb");
   CHECK(f != NULL, "abrir ppm");
   if (f) {
@@ -230,7 +231,6 @@ static void test_render_and_io(void) {
     if (fscanf(f, "P6 %d %d %d", &w, &h, &mx) != 3) { fclose(f); CHECK(0, "cabeçalho ppm"); return; }
     fgetc(f);
     unsigned char px[3];
-    // píxel (49,49): fora do triângulo
     fseek(f, ((long)49 * w + 49) * 3, SEEK_CUR);
     CHECK(fread(px, 1, 3, f) == 3, "ler píxel");
     CHECK(px[0] == 100 && px[1] == 50 && px[2] == 0, "alpha blending 50%");

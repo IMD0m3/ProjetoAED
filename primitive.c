@@ -1,17 +1,6 @@
-/**
- * @file primitive.c
- * @brief Implementation skeleton of the Primitive ADT (2D Vector Objects)
- *
- * Algoritmos e Estruturas de Dados 2026/2027
- * Departamento de Electrónica, Telecomunicações e Informática - UA
- */
-
-/**
- * STUDENT NAME: (preencher)
- * STUDENT NUMBER:
- * STUDENT NAME: (preencher)
- * STUDENT NUMBER:
- */
+// AED 2026/2027 - TAD Primitive (círculo, retângulo, segmento e polígono)
+// Nome: (preencher)    Nº: (preencher)
+// Nome: (preencher)    Nº: (preencher)
 
 #include "primitive.h"
 
@@ -22,37 +11,25 @@
 
 #include "primitive_internal.h"
 
-/** Distância máxima (em píxeis) a um segmento para ser considerado "dentro". */
+// distância máxima (em píxeis) a um segmento para o ponto contar como dentro
 #define SEGMENT_TOLERANCE 1.0
 
-/** Capacidade inicial do array de vértices de um polígono. */
+// capacidade inicial do array de vértices do polígono
 #define INITIAL_POLYGON_CAPACITY 4
 
-// ============================================================================
-// HELPER GEOMETRIC MATH FUNCTIONS (PROVIDED)
-// ============================================================================
-
-/**
- * @brief Tests exact containment of a point inside a circle.
- */
+// testes exatos de pertença (fornecidos)
 static bool math_circle_contains_point(Point center, double radius, Point pt) {
   double dx = pt.x - center.x;
   double dy = pt.y - center.y;
   return (dx * dx + dy * dy) <= (radius * radius);
 }
 
-/**
- * @brief Tests exact containment of a point inside an axis-aligned rectangle.
- */
 static bool math_rect_contains_point(Point top_left, double width,
                                      double height, Point pt) {
   return (pt.x >= top_left.x && pt.x <= (top_left.x + width) &&
           pt.y >= top_left.y && pt.y <= (top_left.y + height));
 }
 
-/**
- * @brief Tests exact containment of a point near line segment (with tolerance).
- */
 static bool math_segment_contains_point(Point p1, Point p2, double tolerance,
                                         Point pt) {
   double l2 = (p2.x - p1.x) * (p2.x - p1.x) + (p2.y - p1.y) * (p2.y - p1.y);
@@ -77,9 +54,6 @@ static bool math_segment_contains_point(Point p1, Point p2, double tolerance,
   return sqrt(dx * dx + dy * dy) <= tolerance;
 }
 
-/**
- * @brief Tests containment of point inside polygon using Ray-Casting.
- */
 static bool math_polygon_contains_point(const Point* vertices,
                                         size_t num_vertices, Point pt) {
   if (num_vertices < 3 || vertices == NULL) {
@@ -100,13 +74,7 @@ static bool math_polygon_contains_point(const Point* vertices,
   return inside;
 }
 
-// ============================================================================
-// INTERNAL AUXILIARY FUNCTIONS (PROVIDED)
-// ============================================================================
-
-/**
- * @brief Allocates base Primitive structure and initializes common fields.
- */
+// aloca a primitiva e preenche os campos comuns
 static Primitive* primitive_allocate_common(int id, PrimitiveType type,
                                             Color color, double alpha,
                                             int z_index) {
@@ -126,10 +94,6 @@ static Primitive* primitive_allocate_common(int id, PrimitiveType type,
 
   return p;
 }
-
-// ============================================================================
-// INSPECTION / GETTER FUNCTIONS (PROVIDED TO STUDENTS)
-// ============================================================================
 
 int primitive_get_id(const Primitive* p) {
   if (p == NULL) return -1;
@@ -163,7 +127,6 @@ double primitive_get_alpha(const Primitive* p) {
 BoundingBox primitive_get_aabb(Primitive* p) {
   assert(p != NULL && "Primitive pointer is NULL");
 
-  // Force AABB update
   if (p->is_aabb_dirty) {
     primitive_update_aabb(p);
   }
@@ -175,14 +138,7 @@ size_t polygon_get_num_vertices(const Primitive* p) {
   return p->geom.polygon.num_vertices;
 }
 
-// ============================================================================
-// CREATION AND DESTRUCTION FUNCTIONS (STUDENTS MUST COMPLETE)
-// ============================================================================
-
-/**
- * [PROVIDED AS REFERENCE MODEL]
- * Creates and dynamically allocates a Circle primitive.
- */
+// construtores: devolvem NULL se os parâmetros forem inválidos
 Primitive* primitive_create_circle(int id, Point center, double radius,
                                    Color color, double alpha, int z_index) {
   if (radius <= 0.0 || alpha < 0.0 || alpha > 1.0) {
@@ -198,7 +154,6 @@ Primitive* primitive_create_circle(int id, Point center, double radius,
   p->geom.circle.center = center;
   p->geom.circle.radius = radius;
 
-  // Automatically calculate initial AABB
   primitive_update_aabb(p);
 
   return p;
@@ -256,7 +211,7 @@ Primitive* primitive_create_polygon(int id, Color color, double alpha,
     return NULL;
   }
 
-  // calloc já deixou vertices = NULL, num_vertices = 0 e capacity = 0
+  // o polígono começa vazio, sem array alocado
   p->geom.polygon.vertices = NULL;
   p->geom.polygon.num_vertices = 0;
   p->geom.polygon.capacity = 0;
@@ -270,16 +225,12 @@ void primitive_destroy(Primitive* p) {
     return;
   }
 
-  // Só o polígono tem memória dinâmica própria
+  // só o polígono tem memória dinâmica própria
   if (p->type == PRIM_POLYGON) {
     free(p->geom.polygon.vertices);
   }
   free(p);
 }
-
-// ============================================================================
-// DYNAMIC ARRAY MANIPULATION (POLYGON) (STUDENTS MUST COMPLETE)
-// ============================================================================
 
 bool polygon_add_vertex(Primitive* p, Point pt) {
   if (p == NULL || p->type != PRIM_POLYGON) {
@@ -288,13 +239,14 @@ bool polygon_add_vertex(Primitive* p, Point pt) {
 
   PolygonGeom* poly = &p->geom.polygon;
 
-  // Array cheio: duplicar a capacidade (ou usar a capacidade inicial)
+  // array cheio: duplica a capacidade
   if (poly->num_vertices == poly->capacity) {
     size_t new_capacity =
         (poly->capacity == 0) ? INITIAL_POLYGON_CAPACITY : poly->capacity * 2;
     Point* new_vertices = realloc(poly->vertices, new_capacity * sizeof(Point));
+    // se o realloc falhar, o array antigo continua válido
     if (new_vertices == NULL) {
-      return false;  // o array antigo continua válido
+      return false;
     }
     poly->vertices = new_vertices;
     poly->capacity = new_capacity;
@@ -316,7 +268,7 @@ bool polygon_remove_vertex(Primitive* p, size_t index) {
     return false;
   }
 
-  // Deslocar para a esquerda os vértices a seguir ao removido
+  // desloca os vértices seguintes para a esquerda
   for (size_t i = index; i + 1 < poly->num_vertices; i++) {
     poly->vertices[i] = poly->vertices[i + 1];
   }
@@ -325,10 +277,7 @@ bool polygon_remove_vertex(Primitive* p, size_t index) {
   return true;
 }
 
-// ============================================================================
-// GEOMETRIC OPERATIONS AND TRANSFORMATIONS (STUDENTS MUST COMPLETE)
-// ============================================================================
-
+// só recalcula se a AABB estiver desatualizada
 void primitive_update_aabb(Primitive* p) {
   if (p == NULL || !p->is_aabb_dirty) {
     return;
@@ -348,9 +297,8 @@ void primitive_update_aabb(Primitive* p) {
       p->aabb.max.y = p->geom.rectangle.top_left.y + p->geom.rectangle.height;
       break;
 
+    // a AABB do segmento inclui a tolerância, para ser coerente com o teste exato
     case PRIM_SEGMENT: {
-      // A AABB é alargada pela tolerância, para ser consistente com
-      // math_segment_contains_point (senão o picking falhava junto às pontas)
       Point a = p->geom.segment.p1;
       Point b = p->geom.segment.p2;
       p->aabb.min.x = fmin(a.x, b.x) - SEGMENT_TOLERANCE;
@@ -362,8 +310,8 @@ void primitive_update_aabb(Primitive* p) {
 
     case PRIM_POLYGON: {
       const PolygonGeom* poly = &p->geom.polygon;
+      // polígono vazio: AABB na origem
       if (poly->num_vertices == 0) {
-        // Polígono vazio: AABB degenerada na origem
         p->aabb.min = (Point){0.0, 0.0};
         p->aabb.max = (Point){0.0, 0.0};
         break;
@@ -383,6 +331,7 @@ void primitive_update_aabb(Primitive* p) {
   p->is_aabb_dirty = false;
 }
 
+// move a geometria e marca a AABB como desatualizada
 void primitive_translate(Primitive* p, double dx, double dy) {
   if (p == NULL) {
     return;
@@ -427,14 +376,14 @@ void primitive_scale(Primitive* p, double factor) {
       p->geom.circle.radius *= factor;
       break;
 
+    // o canto superior esquerdo fica fixo
     case PRIM_RECTANGLE:
-      // Mantém o canto superior esquerdo fixo
       p->geom.rectangle.width *= factor;
       p->geom.rectangle.height *= factor;
       break;
 
+    // escala em relação ao ponto médio
     case PRIM_SEGMENT: {
-      // Escala relativamente ao ponto médio
       Point mid = {(p->geom.segment.p1.x + p->geom.segment.p2.x) / 2.0,
                    (p->geom.segment.p1.y + p->geom.segment.p2.y) / 2.0};
       p->geom.segment.p1.x = mid.x + (p->geom.segment.p1.x - mid.x) * factor;
@@ -449,8 +398,7 @@ void primitive_scale(Primitive* p, double factor) {
       if (poly->num_vertices == 0) {
         break;
       }
-      // Centro da caixa delimitadora (calculado já com os vértices atuais,
-      // porque a AABB guardada pode estar desatualizada)
+      // escala em relação ao centro da AABB (calculada com os vértices atuais)
       Point lo = poly->vertices[0];
       Point hi = poly->vertices[0];
       for (size_t i = 1; i < poly->num_vertices; i++) {
@@ -471,12 +419,12 @@ void primitive_scale(Primitive* p, double factor) {
   p->is_aabb_dirty = true;
 }
 
+// teste exato (narrow-phase), reutiliza as funções math_*
 bool primitive_contains_point(const Primitive* p, Point pt) {
   if (p == NULL) {
     return false;
   }
 
-  // Narrow-phase exact geometric test dispatch
   switch (p->type) {
     case PRIM_CIRCLE:
       return math_circle_contains_point(p->geom.circle.center,

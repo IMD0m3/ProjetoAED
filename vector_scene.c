@@ -1,17 +1,6 @@
-/**
- * @file vector_scene.c
- * @brief Implementation skeleton of the VectorScene ADT (2D Vector Scene)
- *
- * Algoritmos e Estruturas de Dados 2026/2027
- * Departamento de Electrónica, Telecomunicações e Informática - UA
- */
-
-/**
- * STUDENT NAME: (preencher)
- * STUDENT NUMBER:
- * STUDENT NAME: (preencher)
- * STUDENT NUMBER:
- */
+// AED 2026/2027 - TAD VectorScene
+// Nome: (preencher)    Nº: (preencher)
+// Nome: (preencher)    Nº: (preencher)
 
 #include "vector_scene.h"
 
@@ -22,33 +11,14 @@
 
 #include "primitive_internal.h"
 
-// ============================================================================
-// CONCRETE STRUCT LAYOUT (OPAQUE ADT)
-// ============================================================================
-
-/**
- * @brief Concrete structure definition for VectorScene.
- * Hidden from vector_scene.h to enforce encapsulation.
- */
+// a cena guarda um array dinâmico de ponteiros e é dona das primitivas
 struct _VectorScene {
-  int width;              /**< Canvas width in pixels */
-  int height;             /**< Canvas height in pixels */
-  Color bg_color;         /**< Default background color */
-  Primitive** primitives; /**< Dynamic array of pointers to Primitive */
-  size_t count;           /**< Current number of primitives in scene */
-  size_t capacity;        /**< Allocated capacity for primitives array */
-  int next_auto_id;       /**< Auto-increment ID generator */
-};
+  int width;                int height;               Color bg_color;           Primitive** primitives;   size_t count;             size_t capacity;          int next_auto_id;       };
 
+// capacidade inicial do array de primitivas
 #define INITIAL_SCENE_CAPACITY 8
 
-// ============================================================================
-// HELPER FUNCTIONS (PROVIDED TO STUDENTS)
-// ============================================================================
-
-/**
- * @brief Helper to write an RGB pixel buffer to binary PPM file (P6 format).
- */
+// grava o buffer RGB num ficheiro PPM (fornecido)
 static bool save_ppm_image(const char* filename, int width, int height,
                            const uint8_t* pixel_buffer) {
   if (!filename || !pixel_buffer || width <= 0 || height <= 0) {
@@ -68,10 +38,6 @@ static bool save_ppm_image(const char* filename, int width, int height,
 
   return written == total_bytes;
 }
-
-// ============================================================================
-// ACCESSORS / GETTERS (PROVIDED TO STUDENTS)
-// ============================================================================
 
 int vector_scene_get_width(const VectorScene* scene) {
   if (!scene) {
@@ -123,10 +89,6 @@ Primitive* vector_scene_get_primitive_by_id(const VectorScene* scene, int id) {
   return NULL;
 }
 
-// ============================================================================
-// SCENE LIFECYCLE (STUDENTS MUST COMPLETE)
-// ============================================================================
-
 VectorScene* vector_scene_create(int width, int height, Color bg_color) {
   if (width <= 0 || height <= 0) {
     return NULL;
@@ -152,12 +114,12 @@ VectorScene* vector_scene_create(int width, int height, Color bg_color) {
   return scene;
 }
 
+// destrói todas as primitivas e depois a cena
 void vector_scene_destroy(VectorScene* scene) {
   if (!scene) {
     return;
   }
 
-  // A cena é dona das primitivas: destruir cada uma
   for (size_t i = 0; i < scene->count; i++) {
     primitive_destroy(scene->primitives[i]);
   }
@@ -165,29 +127,24 @@ void vector_scene_destroy(VectorScene* scene) {
   free(scene);
 }
 
-// ============================================================================
-// COLLECTION MANAGEMENT (STUDENTS MUST COMPLETE)
-// ============================================================================
-
 int vector_scene_add_primitive(VectorScene* scene, Primitive* p) {
   if (!scene || !p) {
     return -1;
   }
 
-  // Array cheio: duplicar a capacidade
+  // array cheio: duplica a capacidade
   if (scene->count == scene->capacity) {
     size_t new_capacity = scene->capacity * 2;
     Primitive** new_array =
         realloc(scene->primitives, new_capacity * sizeof(Primitive*));
     if (new_array == NULL) {
-      return -1;  // a cena continua válida; o chamador mantém a posse de p
+      return -1;
     }
     scene->primitives = new_array;
     scene->capacity = new_capacity;
   }
 
-  // IDs automáticos para primitivas sem ID; para IDs explícitos garante-se que
-  // o gerador automático nunca os repete
+  // ID automático; os IDs explícitos nunca são repetidos pelo gerador
   if (p->id < 0) {
     p->id = scene->next_auto_id++;
   } else if (p->id >= scene->next_auto_id) {
@@ -200,6 +157,7 @@ int vector_scene_add_primitive(VectorScene* scene, Primitive* p) {
   return p->id;
 }
 
+// destrói a primitiva e desloca as seguintes para a esquerda
 bool vector_scene_remove_primitive(VectorScene* scene, int id) {
   if (!scene || id < 0) {
     return false;
@@ -208,7 +166,6 @@ bool vector_scene_remove_primitive(VectorScene* scene, int id) {
   for (size_t i = 0; i < scene->count; i++) {
     if (scene->primitives[i]->id == id) {
       primitive_destroy(scene->primitives[i]);
-      // Deslocar para a esquerda as primitivas seguintes
       for (size_t j = i; j + 1 < scene->count; j++) {
         scene->primitives[j] = scene->primitives[j + 1];
       }
@@ -218,10 +175,6 @@ bool vector_scene_remove_primitive(VectorScene* scene, int id) {
   }
   return false;
 }
-
-// ============================================================================
-// MANIPULATION AND TRANSFORMATIONS (STUDENTS MUST COMPLETE)
-// ============================================================================
 
 bool vector_scene_translate_primitive(VectorScene* scene, int id, double dx,
                                       double dy) {
@@ -250,21 +203,7 @@ bool vector_scene_set_z_index(VectorScene* scene, int id, int new_z_index) {
   return true;
 }
 
-// ============================================================================
-// SPATIAL SELECTION AND SORTING (STUDENTS MUST COMPLETE & ANALYZE)
-// ============================================================================
-
-/**
- * @brief Sorts an array of primitives by z_index using O(N^2) Insertion Sort.
- *
- * Iterative in-place sorting algorithm. Iterates through the primitive array
- * and inserts each element into its correct sorted position based on z_index.
- * Increments comparison and swap/move metrics in the SortStats structure.
- *
- * @param arr Array of Primitive pointers to sort.
- * @param count Number of elements in the array.
- * @param stats Pointer to SortStats structure to record performance metrics.
- */
+// Insertion Sort estável: conta comparações e deslocamentos
 static void insertion_sort_by_z(Primitive** arr, size_t count,
                                 SortStats* stats) {
   if (count < 2) {
@@ -275,13 +214,11 @@ static void insertion_sort_by_z(Primitive** arr, size_t count,
     Primitive* key = arr[i];
     size_t j = i;
 
-    // Deslocar para a direita os elementos com z_index maior que o da chave.
-    // O teste é estrito (>), logo o algoritmo é estável.
     while (j > 0) {
       if (stats) stats->comparisons++;
       if (arr[j - 1]->z_index > key->z_index) {
         arr[j] = arr[j - 1];
-        if (stats) stats->swaps++;  // cada deslocamento conta como 1 movimento
+        if (stats) stats->swaps++;
         j--;
       } else {
         break;
@@ -291,35 +228,22 @@ static void insertion_sort_by_z(Primitive** arr, size_t count,
   }
 }
 
-/**
- * @brief Merges two sorted subarrays of primitive pointers by z_index.
- *
- * Helper function for MergeSort that combines [left..mid] and [mid+1..right]
- * using a temporary pointer array. Increments comparisons and swaps/moves
- * counters in the SortStats structure.
- *
- * @param arr Array of Primitive pointers to merge.
- * @param temp_arr Auxiliary temporary array of Primitive pointers.
- * @param left Starting index of the first subarray.
- * @param mid Middle index separating the two subarrays.
- * @param right Ending index of the second subarray.
- * @param stats Pointer to SortStats structure to track metrics (can be NULL).
- */
+// junta [left..mid] com [mid+1..right]: conta comparações e cópias
 static void merge_by_z(Primitive** arr, Primitive** temp_arr, size_t left,
                        size_t mid, size_t right, SortStats* stats) {
-  size_t i = left;     // índice na metade esquerda
-  size_t j = mid + 1;  // índice na metade direita
-  size_t k = left;     // índice no array temporário
+  size_t i = left;
+  size_t j = mid + 1;
+  size_t k = left;
 
   while (i <= mid && j <= right) {
     if (stats) stats->comparisons++;
-    // <= garante a estabilidade (em empate fica primeiro o da esquerda)
+    // <= mantém a ordem dos empates (estável)
     if (arr[i]->z_index <= arr[j]->z_index) {
       temp_arr[k++] = arr[i++];
     } else {
       temp_arr[k++] = arr[j++];
     }
-    if (stats) stats->swaps++;  // cópia para temp_arr
+    if (stats) stats->swaps++;
   }
   while (i <= mid) {
     temp_arr[k++] = arr[i++];
@@ -330,25 +254,13 @@ static void merge_by_z(Primitive** arr, Primitive** temp_arr, size_t left,
     if (stats) stats->swaps++;
   }
 
-  // Copiar o resultado de volta para arr
   for (k = left; k <= right; k++) {
     arr[k] = temp_arr[k];
-    if (stats) stats->swaps++;  // cópia de volta para arr
+    if (stats) stats->swaps++;
   }
 }
 
-/**
- * @brief Sorts a subarray of primitives by z_index using O(N log N) MergeSort.
- *
- * Stable recursive Divide-and-Conquer algorithm. Splits the array in half,
- * recursively sorts both halves, and invokes merge_by_z() to merge them.
- *
- * @param arr Array of Primitive pointers to sort.
- * @param temp_arr Auxiliary temporary array allocated for merging.
- * @param left Starting index of the subarray to sort.
- * @param right Ending index of the subarray to sort.
- * @param stats Pointer to SortStats structure to record performance metrics.
- */
+// Merge Sort recursivo
 static void merge_sort_by_z(Primitive** arr, Primitive** temp_arr, size_t left,
                             size_t right, SortStats* stats) {
   if (left >= right) {
@@ -361,11 +273,7 @@ static void merge_sort_by_z(Primitive** arr, Primitive** temp_arr, size_t left,
   merge_by_z(arr, temp_arr, left, mid, right, stats);
 }
 
-/**
- * @brief [Auxiliar] Ordena arr[0..count-1] por z_index com MergeSort,
- * tratando da alocação do array temporário.
- * @return true se ordenou, false se não conseguiu alocar memória.
- */
+// aloca o array temporário e ordena (false se faltar memória)
 static bool merge_sort_array(Primitive** arr, size_t count, SortStats* stats) {
   if (count < 2) {
     return true;
@@ -379,6 +287,7 @@ static bool merge_sort_array(Primitive** arr, size_t count, SortStats* stats) {
   return true;
 }
 
+// ordena por z_index crescente; sem memória para o Merge Sort usa Insertion Sort
 void vector_scene_sort_by_z(VectorScene* scene, bool use_fast_sort,
                             SortStats* stats) {
   if (scene == NULL) return;
@@ -391,7 +300,6 @@ void vector_scene_sort_by_z(VectorScene* scene, bool use_fast_sort,
 
   if (use_fast_sort) {
     if (!merge_sort_array(scene->primitives, scene->count, stats)) {
-      // Sem memória para o array temporário: usar o método básico
       if (stats) {
         stats->comparisons = 0;
         stats->swaps = 0;
@@ -403,6 +311,7 @@ void vector_scene_sort_by_z(VectorScene* scene, bool use_fast_sort,
   }
 }
 
+// devolve a primitiva visível no ponto; com is_opt testa primeiro a AABB
 Primitive* vector_scene_pick_top_primitive(const VectorScene* scene, Point pt,
                                            bool is_opt, PickStats* stats) {
   if (!scene) {
@@ -416,19 +325,15 @@ Primitive* vector_scene_pick_top_primitive(const VectorScene* scene, Point pt,
 
   Primitive* best = NULL;
 
-  // Percorre de trás para a frente: se o array estiver ordenado, o primeiro
-  // acerto é o de maior z_index. Como o array pode não estar ordenado, só se
-  // testam primitivas com z_index maior que o do melhor candidato atual
-  // (em empate fica a de índice mais alto, a última a ser desenhada).
   for (size_t i = scene->count; i > 0; i--) {
     Primitive* p = scene->primitives[i - 1];
 
+    // não pode ficar à frente do melhor candidato
     if (best != NULL && p->z_index <= best->z_index) {
-      continue;  // não pode ficar à frente do candidato atual
+      continue;
     }
 
     if (is_opt) {
-      // Fase 1 (broad-phase): teste barato com a AABB
       BoundingBox box = primitive_get_aabb(p);
       if (stats) stats->aabb_tests++;
       if (pt.x < box.min.x || pt.x > box.max.x || pt.y < box.min.y ||
@@ -437,7 +342,6 @@ Primitive* vector_scene_pick_top_primitive(const VectorScene* scene, Point pt,
       }
     }
 
-    // Fase 2 (narrow-phase): teste geométrico exato
     if (stats) stats->exact_tests++;
     if (primitive_contains_point(p, pt)) {
       best = p;
@@ -447,10 +351,7 @@ Primitive* vector_scene_pick_top_primitive(const VectorScene* scene, Point pt,
   return best;
 }
 
-// ============================================================================
-// RENDERING / RASTERIZATION (STUDENTS MUST COMPLETE)
-// ============================================================================
-
+// Painter's Algorithm: desenha do fundo para a frente e grava em PPM
 bool vector_scene_render(const VectorScene* scene,
                          const char* output_filename) {
   if (!scene || !output_filename) {
@@ -460,7 +361,6 @@ bool vector_scene_render(const VectorScene* scene,
   int width = scene->width;
   int height = scene->height;
 
-  // 1. Buffer de píxeis preenchido com a cor de fundo
   uint8_t* pixels = malloc((size_t)width * height * 3);
   if (pixels == NULL) {
     return false;
@@ -471,8 +371,7 @@ bool vector_scene_render(const VectorScene* scene,
     pixels[3 * i + 2] = scene->bg_color.b;
   }
 
-  // 2. Ordenar por z_index (Painter's Algorithm). A cena é const, por isso
-  // ordena-se uma cópia do array de ponteiros (MergeSort é estável).
+  // a cena é const, por isso ordena-se uma cópia do array
   Primitive** order = NULL;
   if (scene->count > 0) {
     order = malloc(scene->count * sizeof(Primitive*));
@@ -488,19 +387,17 @@ bool vector_scene_render(const VectorScene* scene,
     }
   }
 
-  // 3. Desenhar do fundo para a frente
   for (size_t k = 0; k < scene->count; k++) {
     Primitive* p = order[k];
     BoundingBox box = primitive_get_aabb(p);
 
-    // Janela de píxeis da AABB, cortada ao canvas (feito em double para evitar
-    // overflow ao converter para int)
+    // janela de píxeis da AABB, cortada ao canvas
     double fx0 = fmax(0.0, floor(box.min.x));
     double fy0 = fmax(0.0, floor(box.min.y));
     double fx1 = fmin((double)(width - 1), ceil(box.max.x));
     double fy1 = fmin((double)(height - 1), ceil(box.max.y));
     if (fx0 > fx1 || fy0 > fy1) {
-      continue;  // totalmente fora do canvas
+      continue;
     }
     int x0 = (int)fx0, y0 = (int)fy0, x1 = (int)fx1, y1 = (int)fy1;
 
@@ -509,11 +406,12 @@ bool vector_scene_render(const VectorScene* scene,
 
     for (int y = y0; y <= y1; y++) {
       for (int x = x0; x <= x1; x++) {
-        Point center = {x + 0.5, y + 0.5};  // centro do píxel
+        // testa o centro do píxel
+        Point center = {x + 0.5, y + 0.5};
         if (!primitive_contains_point(p, center)) {
           continue;
         }
-        // Alpha blending: C_final = a * C_nova + (1 - a) * C_fundo (truncado)
+        // alpha blending: C_final = a * C_nova + (1 - a) * C_fundo
         uint8_t* px = &pixels[((size_t)y * width + x) * 3];
         px[0] = (uint8_t)(a * c.r + (1.0 - a) * px[0]);
         px[1] = (uint8_t)(a * c.g + (1.0 - a) * px[1]);
@@ -522,16 +420,11 @@ bool vector_scene_render(const VectorScene* scene,
     }
   }
 
-  // 4./5. Guardar e libertar
   bool ok = save_ppm_image(output_filename, width, height, pixels);
   free(order);
   free(pixels);
   return ok;
 }
-
-// ============================================================================
-// FILE INPUT / OUTPUT (PROVIDED TO STUDENTS)
-// ============================================================================
 
 bool vector_scene_save_text(const VectorScene* scene, const char* filename) {
   if (!scene || !filename) {
@@ -672,9 +565,7 @@ VectorScene* vector_scene_load_text(const char* filename) {
           Primitive* p = primitive_create_polygon(id, color, alpha, z_index);
           if (p) {
             char* ptr = line;
-            // Saltar os 8 tokens do cabeçalho: POLY id z r g b alpha n
-            // (CORREÇÃO: o código fornecido saltava só 7 e lia o nº de
-            // vértices como primeira coordenada)
+            // salta os 8 campos do cabeçalho POLY (o código original saltava só 7)
             for (int k = 0; k < 8; k++) {
               while (*ptr && *ptr != ' ' && *ptr != '\t') {
                 ptr++;
