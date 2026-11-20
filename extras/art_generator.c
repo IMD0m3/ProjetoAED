@@ -18,7 +18,7 @@ int main(void) {
   srand(2026);
   VectorScene* s = vector_scene_create(800, 600, (Color){8, 12, 38});
 
-    // céu em faixas semitransparentes (efeito de degradê)
+    // céu em faixas (efeito de gradiente)
     for (int i = 0; i < 8; i++)
     add(s, primitive_create_rectangle(-1, (Point){0, i * 50.0}, 800, 50,
                                       (Color){60 + i * 12, 40 + i * 8, 90 + i * 6}, 0.18, 0));
@@ -97,8 +97,8 @@ int main(void) {
                                    (Color){120, 120, 170}, 0.4, 13));
 
   printf("Primitivas: %zu\n", vector_scene_get_count(s));
-  vector_scene_save_text(s, "art_group_XX_YY.vsc");
-  if (!vector_scene_render(s, "art_group_XX_YY.ppm")) {
+  vector_scene_save_text(s, "arte_P11G_131828_132523.vsc");
+  if (!vector_scene_render(s, "arte_P11G_131828_132523.ppm")) {
     fprintf(stderr, "erro a renderizar\n");
     return 1;
   }

@@ -1,6 +1,6 @@
 // AED 2026/2027 - TAD VectorScene
-// Nome: (preencher)    Nº: (preencher)
-// Nome: (preencher)    Nº: (preencher)
+// Nome: João Vieira    Nº: 132523
+// Nome: Rafael Alves    Nº: 131828
 
 #include "vector_scene.h"
 
@@ -13,7 +13,14 @@
 
 // a cena guarda um array dinâmico de ponteiros e é dona das primitivas
 struct _VectorScene {
-  int width;                int height;               Color bg_color;           Primitive** primitives;   size_t count;             size_t capacity;          int next_auto_id;       };
+  int width;
+  int height;
+  Color bg_color;
+  Primitive** primitives;
+  size_t count;
+  size_t capacity;
+  int next_auto_id;
+};
 
 // capacidade inicial do array de primitivas
 #define INITIAL_SCENE_CAPACITY 8
@@ -486,6 +493,152 @@ bool vector_scene_save_text(const VectorScene* scene, const char* filename) {
   return true;
 }
 
+// lê uma linha de qualquer tamanho (devolve memória alocada ou NULL no fim)
+static char* read_line(FILE* file) {
+  size_t cap = 256;
+  size_t len = 0;
+  char* buf = malloc(cap);
+  if (buf == NULL) {
+    return NULL;
+  }
+
+  while (fgets(buf + len, (int)(cap - len), file)) {
+    len += strlen(buf + len);
+    if (buf[len - 1] == '\n') {
+      return buf;
+    }
+    if (len + 1 < cap) {
+      return buf;  // fim do ficheiro sem '\n'
+    }
+    char* bigger = realloc(buf, cap * 2);
+    if (bigger == NULL) {
+      free(buf);
+      return NULL;
+    }
+    buf = bigger;
+    cap *= 2;
+  }
+
+  if (len == 0) {
+    free(buf);
+    return NULL;
+  }
+  return buf;
+}
+
+// adiciona à cena; se falhar, destrói a primitiva para não a perder
+static void add_or_destroy(VectorScene* scene, Primitive* p) {
+  if (p == NULL) {
+    return;
+  }
+  if (vector_scene_add_primitive(scene, p) < 0) {
+    primitive_destroy(p);
+  }
+}
+
+// interpreta uma linha do ficheiro (uma segunda linha SCENE é ignorada)
+static void parse_scene_line(VectorScene** scene, const char* line) {
+  if (line[0] == '#' || line[0] == '\n' || line[0] == '\r') {
+    return;
+  }
+
+  char tag[16];
+  if (sscanf(line, "%15s", tag) != 1) {
+    return;
+  }
+
+  if (strcmp(tag, "SCENE") == 0) {
+    int w, h, r, g, b;
+    if (*scene == NULL &&
+        sscanf(line, "SCENE %d %d %d %d %d", &w, &h, &r, &g, &b) == 5) {
+      Color bg = {(uint8_t)r, (uint8_t)g, (uint8_t)b};
+      *scene = vector_scene_create(w, h, bg);
+    }
+    return;
+  }
+
+  if (*scene == NULL) {
+    return;
+  }
+
+  int id, z_index, r, g, b;
+  double alpha;
+
+  if (strcmp(tag, "CIRC") == 0) {
+    double cx, cy, radius;
+    if (sscanf(line, "CIRC %d %d %d %d %d %lf %lf %lf %lf", &id, &z_index, &r,
+               &g, &b, &alpha, &cx, &cy, &radius) == 9) {
+      Point center = {cx, cy};
+      Color color = {(uint8_t)r, (uint8_t)g, (uint8_t)b};
+      add_or_destroy(*scene, primitive_create_circle(id, center, radius, color,
+                                                     alpha, z_index));
+    }
+  } else if (strcmp(tag, "RECT") == 0) {
+    double x, y, w, h;
+    if (sscanf(line, "RECT %d %d %d %d %d %lf %lf %lf %lf %lf", &id, &z_index,
+               &r, &g, &b, &alpha, &x, &y, &w, &h) == 10) {
+      Point top_left = {x, y};
+      Color color = {(uint8_t)r, (uint8_t)g, (uint8_t)b};
+      add_or_destroy(*scene, primitive_create_rectangle(id, top_left, w, h,
+                                                        color, alpha, z_index));
+    }
+  } else if (strcmp(tag, "SEG") == 0) {
+    double x1, y1, x2, y2;
+    if (sscanf(line, "SEG %d %d %d %d %d %lf %lf %lf %lf %lf", &id, &z_index,
+               &r, &g, &b, &alpha, &x1, &y1, &x2, &y2) == 10) {
+      Point p1 = {x1, y1};
+      Point p2 = {x2, y2};
+      Color color = {(uint8_t)r, (uint8_t)g, (uint8_t)b};
+      add_or_destroy(*scene, primitive_create_segment(id, p1, p2, color, alpha,
+                                                      z_index));
+    }
+  } else if (strcmp(tag, "POLY") == 0) {
+    size_t num_verts;
+    if (sscanf(line, "POLY %d %d %d %d %d %lf %zu", &id, &z_index, &r, &g, &b,
+               &alpha, &num_verts) != 7) {
+      return;
+    }
+
+    Color color = {(uint8_t)r, (uint8_t)g, (uint8_t)b};
+    Primitive* p = primitive_create_polygon(id, color, alpha, z_index);
+    if (p == NULL) {
+      return;
+    }
+
+    // salta os 8 campos do cabeçalho POLY
+    const char* ptr = line;
+    for (int k = 0; k < 8; k++) {
+      while (*ptr && *ptr != ' ' && *ptr != '\t') {
+        ptr++;
+      }
+      while (*ptr && (*ptr == ' ' || *ptr == '\t')) {
+        ptr++;
+      }
+    }
+
+    for (size_t v = 0; v < num_verts; v++) {
+      double vx, vy;
+      if (sscanf(ptr, "%lf %lf", &vx, &vy) != 2) {
+        break;
+      }
+      Point pt = {vx, vy};
+      polygon_add_vertex(p, pt);
+
+      for (int k = 0; k < 2; k++) {
+        while (*ptr && *ptr != ' ' && *ptr != '\t' && *ptr != '\n' &&
+               *ptr != '\r') {
+          ptr++;
+        }
+        while (*ptr &&
+               (*ptr == ' ' || *ptr == '\t' || *ptr == '\n' || *ptr == '\r')) {
+          ptr++;
+        }
+      }
+    }
+    add_or_destroy(*scene, p);
+  }
+}
+
 VectorScene* vector_scene_load_text(const char* filename) {
   if (!filename) {
     return NULL;
@@ -496,108 +649,11 @@ VectorScene* vector_scene_load_text(const char* filename) {
     return NULL;
   }
 
-  char line[1024];
   VectorScene* scene = NULL;
-
-  while (fgets(line, sizeof(line), file)) {
-    if (line[0] == '#' || line[0] == '\n' || line[0] == '\r') {
-      continue;
-    }
-
-    char tag[16];
-    if (sscanf(line, "%15s", tag) != 1) {
-      continue;
-    }
-
-    if (strcmp(tag, "SCENE") == 0) {
-      int w, h, r, g, b;
-      if (sscanf(line, "SCENE %d %d %d %d %d", &w, &h, &r, &g, &b) == 5) {
-        Color bg = {(uint8_t)r, (uint8_t)g, (uint8_t)b};
-        scene = vector_scene_create(w, h, bg);
-      }
-    } else if (scene != NULL) {
-      int id, z_index, r, g, b;
-      double alpha;
-
-      if (strcmp(tag, "CIRC") == 0) {
-        double cx, cy, radius;
-        if (sscanf(line, "CIRC %d %d %d %d %d %lf %lf %lf %lf", &id, &z_index,
-                   &r, &g, &b, &alpha, &cx, &cy, &radius) == 9) {
-          Point center = {cx, cy};
-          Color color = {(uint8_t)r, (uint8_t)g, (uint8_t)b};
-          Primitive* p = primitive_create_circle(id, center, radius, color,
-                                                 alpha, z_index);
-          if (p) {
-            vector_scene_add_primitive(scene, p);
-          }
-        }
-      } else if (strcmp(tag, "RECT") == 0) {
-        double x, y, w, h;
-        if (sscanf(line, "RECT %d %d %d %d %d %lf %lf %lf %lf %lf", &id,
-                   &z_index, &r, &g, &b, &alpha, &x, &y, &w, &h) == 10) {
-          Point top_left = {x, y};
-          Color color = {(uint8_t)r, (uint8_t)g, (uint8_t)b};
-          Primitive* p = primitive_create_rectangle(id, top_left, w, h, color,
-                                                    alpha, z_index);
-          if (p) {
-            vector_scene_add_primitive(scene, p);
-          }
-        }
-      } else if (strcmp(tag, "SEG") == 0) {
-        double x1, y1, x2, y2;
-        if (sscanf(line, "SEG %d %d %d %d %d %lf %lf %lf %lf %lf", &id,
-                   &z_index, &r, &g, &b, &alpha, &x1, &y1, &x2, &y2) == 10) {
-          Point p1 = {x1, y1};
-          Point p2 = {x2, y2};
-          Color color = {(uint8_t)r, (uint8_t)g, (uint8_t)b};
-          Primitive* p =
-              primitive_create_segment(id, p1, p2, color, alpha, z_index);
-          if (p) {
-            vector_scene_add_primitive(scene, p);
-          }
-        }
-      } else if (strcmp(tag, "POLY") == 0) {
-        size_t num_verts;
-        int read_header = sscanf(line, "POLY %d %d %d %d %d %lf %zu", &id,
-                                 &z_index, &r, &g, &b, &alpha, &num_verts);
-        if (read_header == 7) {
-          Color color = {(uint8_t)r, (uint8_t)g, (uint8_t)b};
-          Primitive* p = primitive_create_polygon(id, color, alpha, z_index);
-          if (p) {
-            char* ptr = line;
-            // salta os 8 campos do cabeçalho POLY (o código original saltava só 7)
-            for (int k = 0; k < 8; k++) {
-              while (*ptr && *ptr != ' ' && *ptr != '\t') {
-                ptr++;
-              }
-              while (*ptr && (*ptr == ' ' || *ptr == '\t')) {
-                ptr++;
-              }
-            }
-
-            for (size_t v = 0; v < num_verts; v++) {
-              double vx, vy;
-              if (sscanf(ptr, "%lf %lf", &vx, &vy) == 2) {
-                Point pt = {vx, vy};
-                polygon_add_vertex(p, pt);
-
-                for (int k = 0; k < 2; k++) {
-                  while (*ptr && *ptr != ' ' && *ptr != '\t' && *ptr != '\n' &&
-                         *ptr != '\r') {
-                    ptr++;
-                  }
-                  while (*ptr && (*ptr == ' ' || *ptr == '\t' || *ptr == '\n' ||
-                                  *ptr == '\r')) {
-                    ptr++;
-                  }
-                }
-              }
-            }
-            vector_scene_add_primitive(scene, p);
-          }
-        }
-      }
-    }
+  char* line;
+  while ((line = read_line(file)) != NULL) {
+    parse_scene_line(&scene, line);
+    free(line);
   }
 
   fclose(file);

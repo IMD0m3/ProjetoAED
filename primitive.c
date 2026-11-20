@@ -1,6 +1,6 @@
 // AED 2026/2027 - TAD Primitive (círculo, retângulo, segmento e polígono)
-// Nome: (preencher)    Nº: (preencher)
-// Nome: (preencher)    Nº: (preencher)
+// Nome: João Vieira nº 132523
+// Nome: Rafael Alves nº 131828
 
 #include "primitive.h"
 

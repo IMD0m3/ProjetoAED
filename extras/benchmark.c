@@ -15,7 +15,10 @@ static VectorScene* make_scene(int n, int z_mode) {
   VectorScene* s = vector_scene_create(W, H, (Color){255, 255, 255});
   for (int i = 0; i < n; i++) {
     Point c = {rand() % W, rand() % H};
-    int z = (z_mode == 0) ? rand() % 1000000                : (z_mode == 1) ? i                                             : n - i;                Primitive* p = primitive_create_circle(
+    int z = (z_mode == 0) ? rand() % 1000000
+          : (z_mode == 1) ? i
+                          : n - i;
+    Primitive* p = primitive_create_circle(
         -1, c, 5 + rand() % 16, (Color){rand() % 256, rand() % 256, 0}, 1.0, z);
     vector_scene_add_primitive(s, p);
   }
